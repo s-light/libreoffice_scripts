@@ -4,6 +4,105 @@ import os.path
 import uno
 from com.sun.star.beans import PropertyValue
 
+# http://lists.freedesktop.org/archives/libreoffice/2011-April/010382.html
+class MessageBox:
+    def __init__(self, XParentWindow=None):
+        try:
+            if XParentWindow is None:
+                frame = XSCRIPTCONTEXT.getDesktop().getCurrentFrame()
+                XParentWindow = frame.getContainerWindow()
+                self.Parent = XParentWindow
+                self.Toolkit = XParentWindow.getToolkit()
+        except:
+            raise(AttributeError, 'Did not get a valid parent window')
+
+    def msgbox(self, message='', flag=0, title=''):
+        '''Wrapper for com.sun.star.awt.XMessageBoxFactory.'''
+        # rect = uno.createUnoStruct('com.sun.star.awt.Rectangle')
+        dlg = self.Toolkit.createMessageBox(
+            self.Parent,
+            # rect, # this was only neededfor older versions
+            "errorbox",
+            1,
+            title,
+            message
+        )
+        dlg.execute()
+
+
+# some other message box things
+# i did not get theme to work...
+#
+# https://forum.openoffice.org/en/forum/viewtopic.php?p=255989#p255989
+# def showDialog(title, message):
+#     # https://forum.openoffice.org/en/forum/viewtopic.php?p=337262#p337262
+#     model = XSCRIPTCONTEXT.getDocument()
+#     psm = uno.getComponentContext().ServiceManager
+#     dp = psm.createInstanceWithArguments("com.sun.star.awt.DialogProvider", tuple([model]) )
+#     dlg = dp.createDialog("vnd.sun.star.script:Library6.Dialog1?location=document")
+#     dlg.Title = title
+#     dlg.getControl("TextField1").Text = message
+#     dlg.execute()
+#     # dlg.setVisible(True)
+#     # time.sleep(5) ## 5 sec
+#     # dlg.dispose()
+#
+# def dialog_example():
+#      ctx = XSCRIPTCONTEXT.getComponentContext()
+#      smgr = ctx.getServiceManager()
+#      dp = smgr.createInstanceWithContext("com.sun.star.awt.DialogProvider", ctx)
+#      dialog = dp.createDialog("vnd.sun.star.script:Standard.Dialog1?location=user")
+#      dialog.execute()
+#      dialog.dispose()
+#
+#
+# def messagebox_Error(title, message):
+#     messagebox(
+#         ERRORBOX
+#     )
+#
+# https://wiki.openoffice.org/wiki/Python/Transfer_from_Basic_to_Python#Message_Box
+# def messagebox(ctx, parent, message, title, message_type, buttons):
+#     """ Show message in message box. """
+#     toolkit = parent.getToolkit()
+#     older_imple = check_method_parameter(
+#         ctx, "com.sun.star.awt.XMessageBoxFactory", "createMessageBox",
+#         1, "com.sun.star.awt.Rectangle")
+#     if older_imple:
+#         msgbox = toolkit.createMessageBox(
+#             parent, Rectangle(), message_type, buttons, title, message)
+#     else:
+#         message_type = uno.getConstantByName("com.sun.star.awt.MessageBoxType." + {
+#             "messbox": "MESSAGEBOX", "infobox": "INFOBOX",
+#             "warningbox": "WARNINGBOX", "errorbox": "ERRORBOX",
+#             "querybox": "QUERYBOX"}[message_type])
+#         msgbox = toolkit.createMessageBox(
+#             parent, message_type, buttons, title, message)
+#     n = msgbox.execute()
+#     msgbox.dispose()
+#     return n
+#
+#
+# def check_method_parameter(ctx, interface_name, method_name, param_index, param_type):
+#     """ Check the method has specific type parameter at the specific position. """
+#     cr = create_service(ctx, "com.sun.star.reflection.CoreReflection")
+#     try:
+#         idl = cr.forName(interface_name)
+#         m = idl.getMethod(method_name)
+#         if m:
+#             info = m.getParameterInfos()[param_index]
+#             return info.aType.getName() == param_type
+#     except:
+#         pass
+#     return False
+
+
+
+
+
+
+
+
 # https://wiki.openoffice.org/wiki/Python_as_a_macro_language#Error_handling_and_debugging
 
 # https://wiki.openoffice.org/wiki/Framework/Article/Filter
@@ -130,35 +229,48 @@ def save_as(\
         # currentDoc = XSCRIPTCONTEXT.getDocument()
         # doc_type = getDocType(currentDoc)
         # url_current = currentDoc.getLocation()
+        if url_current:
+            url_new = compose_new_URL(
+                doc_type, # doc_type
+                dest_type, # dest_type,
+                url_current, # url_current,
+                url_addition # url_addition
+            )
 
-        url_new = compose_new_URL(
-            doc_type, # doc_type
-            dest_type, # dest_type,
-            url_current, # url_current,
-            url_addition # url_addition
-        )
+            properties=[]
 
-        properties=[]
+            p = PropertyValue()
+            p.Name = 'FilterName'
+            p.Value = doc_type[dest_type]['filter']
+            properties.append(p)
 
-        p = PropertyValue()
-        p.Name = 'FilterName'
-        p.Value = doc_type[dest_type]['filter']
-        properties.append(p)
+            p = PropertyValue()
+            p.Name = 'Overwrite'
+            p.Value = True
+            properties.append(p)
 
-        p = PropertyValue()
-        p.Name = 'Overwrite'
-        p.Value = True
-        properties.append(p)
+            p = PropertyValue()
+            p.Name = 'InteractionHandler'
+            p.Value = ''
+            properties.append(p)
 
-        p = PropertyValue()
-        p.Name = 'InteractionHandler'
-        p.Value = ''
-        properties.append(p)
+            if additional_properties:
+                properties.extend(additional_properties)
 
-        if additional_properties:
-            properties.extend(additional_properties)
-
-        currentDoc.storeToURL(url_new, tuple(properties))
+            currentDoc.storeToURL(url_new, tuple(properties))
+        else:
+            print("pleas first save your file!")
+            # raise NoLocationError()
+            # showDialog(
+            #     'No Location',
+            #     'No Location found.\n please first save your file'
+            # )
+            # dialog_example()
+            box = MessageBox()
+            box.msgbox(
+                title = 'No Location',
+                message = 'No Location found.\nplease save your file first'
+            )
     else:
         print("no type given. i cant work...")
 
